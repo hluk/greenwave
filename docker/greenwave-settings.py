@@ -6,6 +6,12 @@ POLICIES_DIR = '/etc/greenwave/policies/'
 WAIVERDB_API_URL = 'http://waiverdb:5004/api/v1.0'
 RESULTSDB_API_URL = 'http://resultsdb:5001/api/v2.0'
 GREENWAVE_API_URL = 'http://dev:8080/api/v1.0'
+
+KOJI_BASE_URL = 'http://localhost:8000'
+REMOTE_RULE_POLICIES = {
+    '*': 'http://localhost:5678/{pkg_namespace}{pkg_name}/raw/{rev}/f/gating.yaml'
+}
+
 CACHE = {
     # 'backend': "dogpile.cache.null",
     'backend': "dogpile.cache.memcached",

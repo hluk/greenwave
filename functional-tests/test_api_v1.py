@@ -39,7 +39,7 @@ def test_inspect_policies(requests_session, greenwave_server):
     assert r.status_code == 200
     body = r.json()
     policies = body['policies']
-    assert len(policies) == 16
+    assert len(policies) == 17
     assert any(p['id'] == 'taskotron_release_critical_tasks' for p in policies)
     assert any(p['decision_context'] == 'bodhi_update_push_stable' for p in policies)
     assert any(p['product_versions'] == ['fedora-26'] for p in policies)
@@ -1720,3 +1720,37 @@ def test_make_a_decision_on_passed_result_with_custom_scenario(
             'type': 'test-result-passed'
         }
     ]
+
+@pytest.mark.parametrize('verbose', (False, True))
+def test_big_decision(verbose, benchmark, requests_session, greenwave_server, testdatabuilder):
+    """
+    Benchmarks a big decision with many required tests and remote rule.
+    """
+    nvr = testdatabuilder.unique_nvr()
+    for i, outcome in enumerate(('PASSED', 'FAILED', 'QUEUED')):
+        for n in range(i * 5 + 1, i * 5 + 6):
+            testdatabuilder.create_result(item=nvr, testcase_name=f'test{n}', outcome=outcome)
+            testdatabuilder.create_result(item=nvr, testcase_name=f'test{n}x', outcome=outcome)
+            testdatabuilder.create_result(item=nvr, testcase_name=f'test{n}y', outcome=outcome)
+            testdatabuilder.create_result(item=nvr, testcase_name=f'test{n}z', outcome=outcome)
+
+    data = {
+        'decision_context': 'big_decision',
+        'product_version': 'fedora-99',
+        'subject_type': 'koji_build',
+        'subject_identifier': nvr,
+        'verbose': verbose,
+    }
+
+    decision = benchmark(requests_session.post, greenwave_server + 'api/v1.0/decision', json=data)
+
+    assert decision.status_code == 200
+    data = decision.json()
+    assert [x['testcase'] for x in data['satisfied_requirements']] == [
+        f'test{n}' for n in range(1, 6)
+    ]
+    assert [(x['testcase'], x['type']) for x in data['unsatisfied_requirements']] == [
+        (f'test{n}', 'test-result-missing' if n > 10 else 'test-result-failed')
+        for n in range(6, 21)
+    ]
+    assert data['summary'] == '5 of 20 required tests failed, 10 results missing'

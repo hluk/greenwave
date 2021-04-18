@@ -191,6 +191,19 @@ def distgit_server(tmpdir_factory):
 
 
 @pytest.yield_fixture(scope='session')
+def koji_server():
+    """ Creating a fake koji process. It is just a serving some files in a tmp dir """
+    start_server_arguments = [sys.executable, 'dummy_kojihub.py']
+
+    with server_subprocess(
+            name='koji',
+            port=8000,
+            source_path='koji',
+            start_server_arguments=start_server_arguments) as url:
+        yield url
+
+
+@pytest.yield_fixture(scope='session')
 def cache_config(tmpdir_factory):
     cache_file = tmpdir_factory.mktemp('greenwave').join('cache.dbm')
     if 'GREENWAVE_TEST_URL' in os.environ:
@@ -248,11 +261,12 @@ class TestDataBuilder(object):
     ResultsDB and WaiverDB.
     """
 
-    def __init__(self, requests_session, resultsdb_url, waiverdb_url, distgit_url):
+    def __init__(self, requests_session, resultsdb_url, waiverdb_url, distgit_url, koji_url):
         self.requests_session = requests_session
         self.resultsdb_url = resultsdb_url
         self.waiverdb_url = waiverdb_url
         self.distgit_url = distgit_url
+        self.koji_url = koji_url
         self._counter = itertools.count(time.time())
 
     def unique_nvr(self, name='glibc', product_version='el7'):
@@ -338,6 +352,7 @@ class TestDataBuilder(object):
 
 
 @pytest.fixture(scope='session')
-def testdatabuilder(requests_session, resultsdb_server, waiverdb_server, distgit_server):
+def testdatabuilder(
+        requests_session, resultsdb_server, waiverdb_server, distgit_server, koji_server):
     return TestDataBuilder(requests_session, resultsdb_server, waiverdb_server,
-                           distgit_server)
+                           distgit_server, koji_server)

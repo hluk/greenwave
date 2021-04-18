@@ -141,3 +141,33 @@ decision_context: compose_test_scenario_group
 subject_type: group
 rules:
   - !PassingTestCaseRule {test_case_name: testcase_name}
+
+# Bundle gating in IIB for Container Verification Pipeline RedHat Operators
+--- !Policy
+id: "big_decision"
+product_versions:
+  - fedora-*
+decision_context: big_decision
+subject_type: koji_build
+rules:
+  - !PassingTestCaseRule {test_case_name: test1}
+  - !PassingTestCaseRule {test_case_name: test2}
+  - !PassingTestCaseRule {test_case_name: test3}
+  - !PassingTestCaseRule {test_case_name: test4}
+  - !PassingTestCaseRule {test_case_name: test5}
+  - !PassingTestCaseRule {test_case_name: test6}
+  - !PassingTestCaseRule {test_case_name: test7}
+  - !PassingTestCaseRule {test_case_name: test8}
+  - !PassingTestCaseRule {test_case_name: test9}
+  - !PassingTestCaseRule {test_case_name: test10}
+  - !PassingTestCaseRule {test_case_name: test11}
+  - !PassingTestCaseRule {test_case_name: test12}
+  - !PassingTestCaseRule {test_case_name: test13}
+  - !PassingTestCaseRule {test_case_name: test14}
+  - !PassingTestCaseRule {test_case_name: test15}
+  - !PassingTestCaseRule {test_case_name: test16}
+  - !PassingTestCaseRule {test_case_name: test17}
+  - !PassingTestCaseRule {test_case_name: test18}
+  - !PassingTestCaseRule {test_case_name: test19}
+  - !PassingTestCaseRule {test_case_name: test20}
+  - !RemoteRule {}

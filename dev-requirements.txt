@@ -1,6 +1,7 @@
 # Testing requirements
 flake8
 pytest
+pytest-benchmark
 pytest-cov
 gunicorn
 sqlalchemy
