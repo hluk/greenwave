@@ -17,6 +17,7 @@ RUN dnf -y install \
     python3-prometheus_client \
     python3-PyYAML \
     python3-requests \
+    python-requests-futures \
     && dnf -y clean all \
     && rm -rf /tmp/*
 

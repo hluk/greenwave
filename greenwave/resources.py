@@ -62,14 +62,14 @@ class BaseRetriever:
         else:
             self.since = None
 
-    def retrieve(self, *args, **kwargs):
-        items = self._retrieve_all(*args, **kwargs)
-        return [item for item in items if item['id'] not in self.ignore_ids]
-
-    def _retrieve_data(self, params):
-        response = self._make_request(params)
-        response.raise_for_status()
-        return response.json()['data']
+    def _retrieve_items(self, futures):
+        for future in futures:
+            response = requests_session.response(future)
+            response.raise_for_status()
+            items = response.json()['data']
+            for item in items:
+                if item['id'] not in self.ignore_ids:
+                    yield item
 
 
 class ResultsRetriever(BaseRetriever):
@@ -83,50 +83,40 @@ class ResultsRetriever(BaseRetriever):
             current_app.config['DISTINCT_LATEST_RESULTS_ON'])
         self.cache = {}
 
-    def _retrieve_all(self, subject, testcase=None):
-        # Get test case result from cache if all test case results were already
-        # retrieved for given Subject.
-        cache_key = (subject.type, subject.identifier)
-        if testcase and cache_key in self.cache:
-            return [res for res in self.cache[cache_key] if res['testcase']['name'] == testcase]
+    def results(self):
+        for futures in self.cache.values():
+            yield from self._retrieve_items(futures)
 
-        # Try to get passing test case result from external cache.
-        external_cache_key = None
-        if testcase:
-            external_cache_key = (
-                "greenwave.resources:ResultsRetriever|"
-                f"{subject.type} {subject.identifier} {testcase}")
-            results = self.get_external_cache(external_cache_key)
-            if results and self._results_match_time(results):
-                return results
+    def retrieve(self, subject, testcase, scenario):
+        futures = self.cache.get(subject, [])
+        scenarios = result['data'].get('scenario', [])
+        return [
+            result
+            for result in self._retrieve_items(futures)
+            if result['testcase']['name'] == testcase and
+            (scenario is None or scenario in scenarios)
+        ]
+
+    def request_futures(self, subject):
+        if subject in self.cache:
+            return
 
         params = {
             '_distinct_on': self._distinct_on
         }
         if self.since:
             params.update({'since': self.since})
-        if testcase:
-            params.update({'testcases': testcase})
 
-        results = []
+        futures = []
         for query in subject.result_queries():
             query.update(params)
-            results.extend(self._retrieve_data(query))
+            futures.append(self._make_request(query))
 
-        if not testcase:
-            self.cache[cache_key] = results
-
-        # Store test case results in external cache if all are passing,
-        # otherwise retrieve from ResultsDB again later.
-        if external_cache_key and all(
-                result.get('outcome') in current_app.config['OUTCOMES_PASSED']
-                for result in results):
-            self.set_external_cache(external_cache_key, results)
-
-        return results
+        self.cache[subject] = futures
 
     def _make_request(self, params, **request_args):
-        return requests_session.get(
+        return requests_session.request_future(
+            'get',
             self.url + '/results/latest',
             params=params,
             **request_args)
@@ -150,15 +140,20 @@ class WaiversRetriever(BaseRetriever):
     Retrieves waivers from WaiverDB.
     """
 
-    def _retrieve_all(self, filters):
+    def request(self, filters):
         if self.since:
             for filter_ in filters:
                 filter_.update({'since': self.since})
-        waivers = self._retrieve_data(filters)
+        return [self._make_request(filters)]
+
+    def retrieve(self, *args, **kwargs):
+        futures = self.request(*args, **kwargs)
+        waivers = self._retrieve_items(futures)
         return [waiver for waiver in waivers if waiver['waived']]
 
     def _make_request(self, params, **request_args):
-        return requests_session.post(
+        return requests_session.request_future(
+            'post',
             self.url + '/waivers/+filtered',
             json={'filters': params},
             **request_args)

@@ -34,8 +34,8 @@ class RuleContext:
         self.results_retriever = results_retriever
         self.verified_rules = set()
 
-    def get_results(self, test_case_name):
-        return self.results_retriever.retrieve(self.subject, test_case_name)
+    def get_results(self, test_case_name, scenario):
+        return self.results_retriever.retrieve(self.subject, test_case_name, scenario)
 
     def verify(self, policy, rule):
         if rule in self.verified_rules:
@@ -79,8 +79,6 @@ class Decision:
                     subject.type, self.decision_context, self.product_version))
 
         if self.verbose:
-            # Retrieve test results and waivers for all items when verbose output is requested.
-            self.verbose_results.extend(results_retriever.retrieve(subject))
             self.waiver_filters.append(dict(
                 subject_type=subject.type,
                 subject_identifier=subject.identifier,
@@ -180,9 +178,10 @@ def make_decision(data, config):
         raise BadRequest('Cannot have both decision_context and rules')
 
     on_demand_policies = []
+    subjects = list(_decision_subjects_for_request(data))
     if rules:
         request_data = {key: data[key] for key in data if key not in ('subject', 'subject_type')}
-        for subject in _decision_subjects_for_request(data):
+        for subject in subjects:
             request_data['subject_type'] = subject.type
             request_data['subject_identifier'] = subject.identifier
             on_demand_policy = OnDemandPolicy.create_from_json(request_data)
@@ -213,7 +212,9 @@ def make_decision(data, config):
 
     policies = on_demand_policies or config['policies']
     decision = Decision(decision_context, product_version, verbose)
-    for subject in _decision_subjects_for_request(data):
+    for subject in subjects:
+        results_retriever.request_futures(subject)
+    for subject in subjects:
         decision.check(subject, policies, results_retriever)
 
     decision.waive_answers(waivers_retriever)

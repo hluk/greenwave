@@ -1,6 +1,7 @@
 flask
 python-dateutil
 requests
+requests-futures
 PyYAML
 dogpile.cache
 fedmsg[consumers]

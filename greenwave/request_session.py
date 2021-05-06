@@ -9,6 +9,7 @@ from urllib3.util.retry import Retry
 from urllib3.exceptions import ProxyError, SSLError
 
 from flask import current_app, has_app_context
+from requests_futures.sessions import FuturesSession
 
 from greenwave import __version__
 
@@ -28,26 +29,27 @@ class ErrorResponse(requests.Response):
         return dumps({'message': self._error_message}).encode()
 
 
-class RequestsSession(requests.Session):
+class RequestsSession(FuturesSession):
     def request(self, *args, **kwargs):  # pylint:disable=arguments-differ
-        log.debug('Request: args=%r, kwargs=%r', args, kwargs)
+        future = self.request_future(self, *args, **kwargs)
+        return self.response(future)
 
-        req_url = kwargs.get('url', args[1])
+    def response(self, future):
+        try:
+            return future.result()
+        except (ConnectTimeout, RetryError) as e:
+            ret_val = ErrorResponse(504, str(e), future.request.url)
+        except (ConnectionError, ProxyError, SSLError) as e:
+            ret_val = ErrorResponse(502, str(e), future.request.url)
+        return ret_val
 
+    def request_future(self, *args, **kwargs):  # pylint:disable=arguments-differ
         kwargs.setdefault('headers', {'Content-Type': 'application/json'})
         if has_app_context():
             kwargs.setdefault('timeout', current_app.config['REQUESTS_TIMEOUT'])
             kwargs.setdefault('verify', current_app.config['REQUESTS_VERIFY'])
 
-        try:
-            ret_val = super().request(*args, **kwargs)
-        except (ConnectTimeout, RetryError) as e:
-            ret_val = ErrorResponse(504, str(e), req_url)
-        except (ConnectionError, ProxyError, SSLError) as e:
-            ret_val = ErrorResponse(502, str(e), req_url)
-
-        log.debug('Request finished: %r', ret_val)
-        return ret_val
+        return super().request(*args, **kwargs)
 
 
 def get_requests_session():

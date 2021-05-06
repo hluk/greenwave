@@ -711,12 +711,7 @@ class PassingTestCaseRule(Rule):
             if self.valid_until and self.valid_until <= subject_creation_time:
                 return []
 
-        matching_results = rule_context.get_results(self.test_case_name)
-
-        if self.scenario is not None:
-            matching_results = [
-                result for result in matching_results
-                if self.scenario in result['data'].get('scenario', [])]
+        matching_results = rule_context.get_results(self.test_case_name, self.scenario)
 
         # Investigate the absence of result first.
         if not matching_results:

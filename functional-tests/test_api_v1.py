@@ -1752,5 +1752,5 @@ def test_big_decision(verbose, benchmark, requests_session, greenwave_server, te
     assert [(x['testcase'], x['type']) for x in data['unsatisfied_requirements']] == [
         (f'test{n}', 'test-result-missing' if n > 10 else 'test-result-failed')
         for n in range(6, 21)
-    ]
-    assert data['summary'] == '5 of 20 required tests failed, 10 results missing'
+    ] + [('failed-fetch-gating-yaml', 'failed-fetch-gating-yaml')]
+    assert data['summary'] == '6 of 21 required tests failed, 10 results missing'
